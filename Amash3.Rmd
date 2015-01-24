@@ -1,0 +1,279 @@
+'Defund the NSA': how to dodge it better
+========================================
+
+Introduction
+------------
+
+Having found [sufficient evidence](http://rpubs.com/ghuiber/DefundTheNSA) that money helps, security and defense industry interests might appreciate an estimate of how much per US Representative they should expect to pay for avoiding such close calls as the Amash amendment vote in the future. This might be useful because though peace of mind may well be priceless in the abstract, nobody likes to overpay.
+
+So, at the instigation of [Bryan Shepherd](https://twitter.com/cozymandias), who gave me the idea, I propose a recipe for influence-buying spend optimization. The quest is not hopeless because, as my simulations below show, US Representatives' response to campaign help is positive and robust. The recipe can be adapted for any special interest, any issue. The Amash amendment vote and the the security-industrial complex are but a working example.
+
+Follow along, and your attention will be rewarded richly. You will know how to figure the going price of a vote in your favor. You might find the work easy enough to seriously consider firing your expensive lobbyists: it's quite possible that all you need is a competent bag man. 
+
+The data
+--------
+
+I am using the same [MapLight](http://maplight.org) [summarized data set](http://s3.documentcloud.org/documents/741074/amash-amendment-vote-maplight.pdf) referenced in [Wired](http://www.wired.com/threatlevel/2013/07/money-nsa-vote/) that I used for [following the money](http://rpubs.com/ghuiber/DefundTheNSA).
+
+The model(s)
+------------
+
+Suppose that you are the security-industrial complex and you want a majority of No votes on the Amash amendment. The final tally of votes is the outcome of a stochastic process, where the probability of a No can be modeled as a function of party affiliation and industry funding using logistic regression. We assume that the vote of any US Representative $i$ is drawn from a distribution that can produce a Yes or a No:
+
+$$ Y_i \sim Bernoulli(y_i|\pi_i) $$
+
+$$ \pi_i \equiv Pr(y_i=1|x_i) = \frac{1}{1+exp(-\boldsymbol{\beta x_i})} $$
+
+The outcome $y_i=1$ is our code for a No vote on the Amash amendment. That's what we see, but what we're after is the latent probability of such a vote, $\pi_i$, as a function of party affiliation and amounts raised from interested parties, $\boldsymbol{\beta x_i}$. 
+
+The full specification of $\boldsymbol{\beta x_i}$ can be either 
+
+$$ \boldsymbol{\beta x_i} = \beta_0 + \beta_1 Party + \beta_2 Amount$$
+
+or 
+
+$$ \boldsymbol{\beta x_i} = \beta_0 + \beta_1 Party + \beta_2 Amount + \beta_3 (Party*Amount)$$
+
+Both specifications above -- call them Model 1 and Model 2 -- estimate the baseline difference between the two parties in the probability of a No vote through $\beta_1$. Model 1 captures the effect of funding through $\beta_2$ only. In other words, it assumes that the US Representatives' response to campaign help is identical across the two parties. Model 2 relaxes this assumption: it allows for party-specific differences in the rate at which extra funding may buy extra help, through the interaction effect $\beta_3$.
+
+The relationship of interest
+----------------------------
+
+```{r setUp, echo=FALSE, eval=TRUE, warning=FALSE, message=FALSE, cache=TRUE}
+library(ggplot2)
+library(Zelig)
+# Read raw data
+df <- read.csv('amashvotevsmoney.csv',header=T,sep="|",stringsAsFactors=F,strip.white=T)
+
+# Clean up a bit
+df$Amount <- as.numeric(gsub("\\$|,","", df$Amount)) # make dollars numeric
+names(df)[3] <- 'District'                           # shorten district name
+df <- df[df$Vote!='Not Voting',]                     # drop abstainers (I want 2 categories for Wilcoxon rank-sum test)
+incr <- 5000
+maxd <- 200000
+
+# Now estimate prob of voting No as a function of Party and Amount. Use Zelig.
+df$Vote  <- factor(df$Vote, levels=c('Yes','No'))
+df$Party <- factor(df$Party)
+z1.out <- zelig(Vote ~ Party + Amount, data=df, model="logit", cite=FALSE)
+z2.out <- zelig(Vote ~ Party + Amount + Party*Amount, data=df, model="logit", cite=FALSE)
+getSims <- function(z.out) {
+   x.R <- setx(z.out,Party='R',Amount=seq(0,maxd,incr))
+   x.D <- setx(z.out,Party='D',Amount=seq(0,maxd,incr))
+   s.out <- sim(z.out,x=x.D,x1=x.R)
+   s.D <- sim(z.out,x=x.D,x1=x.R)
+   s.R <- sim(z.out,x=x.R,x1=x.D)
+   c <- list(x.R,x.D,s.out,s.D,s.R)
+   names(c) <- c('x.R','x.D','s.out','s.D','s.R')
+   return(c)
+}   
+m1 <- getSims(z1.out)
+m2 <- getSims(z2.out)
+```
+
+We care about the increase in willingness to vote No -- mapped on the vertical axis as the probability of a No vote -- in response to an increase in campaign help -- mapped on the horizontal axis as dollar amounts per US Representative, from 0 to $`r formatC(maxd,format='fg',big.mark=',')` in increments of $`r prettyNum(incr,big.mark=',')`. 
+
+If it is true that money cannot buy influence, the graph should be a flat horizontal line at whatever the average probability of a No vote is by party: more funding won't change this probability. The data, however, suggests that a more cynical worldview may well be in order.
+
+I will use the [Zelig](http://gking.harvard.edu/zelig) package to simulate some funding scenarios under both models, and the [ggplot2](http://ggplot2.org/) package to plot the response curves.
+
+The response curves
+-------------------
+
+```{r drawPic, echo=FALSE, eval=TRUE, warning=FALSE, message=FALSE, cache=TRUE}
+# Collect predicted values from a Zelig sim() object
+collectPredictedValues <- function(zs) {
+   rnames    <- names(summary(zs)[['stats']])
+   expected  <- NULL
+   predicted <- NULL
+   for(i in rnames) {
+      expected  <- rbind(expected,summary(zs)[['stats']][[i]][[1]])
+      predicted <- rbind(predicted,summary(zs)[['stats']][[i]][[2]])
+   }
+   c <- cbind(expected,predicted)
+   rownames(c) <- rnames
+   return(c)
+}
+getPV <- function(m) {
+   p.D <- collectPredictedValues(m[['s.D']])
+   p.R <- collectPredictedValues(m[['s.R']])
+   p.No <- as.data.frame(rbind(p.R[,c(6,7)],p.D[,c(6,7)]))
+   p.No$group  <- rownames(p.No)
+   names(p.No) <- c('Yes','No','Group')
+   p.No$Amount <- as.numeric(gsub("^P.*=","",p.No$Group,perl=T))
+   p.No$Party  <- gsub("(Party=|,.*)","",p.No$Group,perl=T)
+   p.No <- p.No[,c('Party','Amount','Yes','No')]   
+   return(p.No)
+}
+getEV <- function(m) {
+   p.D <- collectPredictedValues(m[['s.D']])
+   p.R <- collectPredictedValues(m[['s.R']])
+   p.No <- as.data.frame(rbind(p.R[,c(1,2)],p.D[,c(1,2)]))
+   p.No$group  <- rownames(p.No)
+   names(p.No) <- c('Mean','SD','Group')
+   p.No$Amount <- as.numeric(gsub("^P.*=","",p.No$Group,perl=T))
+   p.No$Party  <- gsub("(Party=|,.*)","",p.No$Group,perl=T)
+   p.No <- p.No[,c('Party','Amount','Mean','SD')]   
+   return(p.No)
+}
+# Predicted P(No) graph
+drawPPic <- function(m,mname) {
+   p.No <- getPV(m)
+   pic <- ggplot(data=p.No, aes(x=Amount, y=No, group=Party, color=Party)) + geom_line() + xlab('Funding from security and defense industry') + ylab('Predicted P(votes No)') + ggtitle(paste('Predicted probability of a No vote by party,',mname,sep=' '))
+   pic <- pic + scale_colour_manual(values=c("blue", "red"))    
+   return(pic)
+}
+# Expected P(No) graph
+drawEPic <- function(m,mname) {
+   p.No <- getEV(m)
+   pic <- ggplot(data=p.No, aes(x=Amount, y=Mean, group=Party, color=Party)) + geom_line() + xlab('Funding from security and defense industry') + ylab('Expected P(votes No)') + ggtitle(paste('Expected probability of a No vote by party,',mname,sep=' '))
+   pic <- pic + scale_colour_manual(values=c("blue", "red"))   
+   return(pic)
+}
+ppic1 <- drawPPic(m1,'Model 1')
+ppic2 <- drawPPic(m2,'Model 2')
+epic1 <- drawEPic(m1,'Model 1')
+epic2 <- drawEPic(m2,'Model 2')
+p1.No <- getPV(m1)
+p2.No <- getPV(m2)
+```
+
+It is immediately obvious from Model 1 that US Representatives from both parties respond well to funding. Eyeballing around the .5 horizontal line, it looks from Model 1 that it might cost about $10,000 to flip a Republican's probability of a No vote from below 50% to above that, while the going rate for a Democrat seems to be around $40,000:
+
+```{r showEPics, echo=FALSE, eval=TRUE, warning=FALSE, message=FALSE, cache=TRUE}
+epic1
+epic2
+```
+
+By assumption, this $30,000 difference between Democrats and Republicans is held constant in Model 1, and you can see that the two curves track each other at about this horizontal distance. In other words, beyond the baseline, a dollar buys about the same amount of influence in both parties. 
+
+Model 2 says that Democrats are far more expensive: not only are they less likely to vote No at baseline, but Democratic gains in the probability of a No vote in response to funding grow more slowly. The average difference is far larger than the $30,000 estimated by Model 1 and widening. The price to flip a Republican is larger than $10,000, and a Democrat will demand more than $50,000. 
+
+How sure are we about this?
+---------------------------
+
+Both models are simplified representations of the world. They do not take into account the US Representatives' own preferences, or the extent to which they speak for constituencies that have majority views of their own -- whether they're hawkish enough on national security to disagree with the Amash amendment, or privacy-minded enough to embrace it. As such, the curves above show "other things equal" relationships and they are based on parameters that are estimated with some uncertainty that will have to be taken into account somehow. 
+
+One way to model uncertainty graphically is as a succession of vertical bars whose heights cover the 95% confidence intervals around the expected probability estimates that correspond to each $`r prettyNum(incr,big.mark=',')` increment in the amount of funding.
+
+```{r drawCIplots, echo=FALSE, eval=TRUE, warning=FALSE, message=FALSE, cache=TRUE}
+# Now try and draw somehow vertical confidence 
+# intervals. plot.ci() in latest Zelig bugged.
+# Step 1. Get the 95CI for a No by amount, by 
+# party, for a given model.
+getCIData <- function(m) {
+   p.D <- collectPredictedValues(m[['s.D']])
+   p.R <- collectPredictedValues(m[['s.R']])
+   p.No <- as.data.frame(rbind(p.R[,c(4,5)],p.D[,c(4,5)]))
+   p.No$group  <- rownames(p.No)
+   names(p.No) <- c('Lower','Upper','Group')
+   p.No$Amount <- as.numeric(gsub("^P.*=","",p.No$Group,perl=T))
+   p.No$Party  <- gsub("(Party=|,.*)","",p.No$Group,perl=T)
+   p.No <- p.No[,c('Party','Amount','Lower','Upper')]   
+   return(p.No)
+}
+# Then put it into long format (make it tidy for ggplot2 to handle)
+makeItLong <- function(p) {
+   p.long <- reshape(p, direction="long", varying=c('Lower','Upper'), v.names="Value", idvar=c("Party","Amount"), timevar="CI", times=c('Lower','Upper'))
+   p.long.sorted <- p.long[order(p.long$Party,p.long$Amount,p.long$CI),]
+   return(as.data.frame(p.long.sorted))
+}
+ci.m1 <- makeItLong(getCIData(m1))
+ci.m2 <- makeItLong(getCIData(m2))
+
+# You will need to use a hack for the vertical lines to stop
+# properly at the dots. You must group geom_line() by (Amount,Party)
+# pair. If you group it only by Amount, lines will connect all 4
+# dots for that amount. If you group the by Party, lines are no longer
+# vertical, but zig-zagging. 
+# However, you cannot group by a set of variables. You can only group
+# by one variable strictly. So, this pair (Amount,Party) must be
+# approximated by something close enough to Amount, yet different
+# by Party. That's why you need the internal foo data frame. The
+# new variable named Grouping adds 1 for Democrats and 2 for 
+# Republicans to every value of Amount. This fixes the problem.
+getCIplot <- function(df,mname) {
+   foo <- df
+   foo$Grouping <- df$Amount+as.numeric(as.factor(df$Party))
+   p <- ggplot(data=foo, aes(x=Amount, y=Value, group=Amount, colour=Party)) + geom_point() + geom_line(aes(group = Grouping))   
+   p <- p + xlab('Funding from security and defense industry') + ylab('Expected P(votes No)') + ggtitle(paste('95% confidence intervals for the expected \n probabilities of a No vote by party,',mname,sep=' '))
+   p <- p + scale_colour_manual(values=c("blue", "red"))
+   return(p)
+}
+ci.plot.m1 <- getCIplot(ci.m1,'Model 1')
+ci.plot.m2 <- getCIplot(ci.m2,'Model 2')
+```
+
+```{r showCIPics, echo=FALSE, eval=TRUE, warning=FALSE, message=FALSE, cache=TRUE}
+ci.plot.m1
+ci.plot.m2
+```
+
+How to read the pictures above: first, the height of the vertical bars approximates our uncertainty about the response to any given amount; second, the true difference in response between the two parties is inversely proportional to the extent to which the two sets of vertical bars overlap. 
+
+Model 1, without the interaction term between amount of funding and party affiliation, basically says that the two parties gradually blend into one at levels of funding larger than $50,000 per head. In other words, money talks and a lot of money talks loudly enough that everybody will stop and listen.
+
+Model 2 sees it differently. The interaction term is statistically significant, and it keeps the response curves pretty well separated from each other. Also, the growing height of the blue bars at high levels of funding means that we are increasingly unsure how well Democrats respond to a lot of industry money. 
+
+This is both because few Democrats get a lot of industry money and because not all who do show proper gratitude. Only three of the top 10 Democratic US Representatives best funded by the security-industrial complex clear the $150,000 mark, not all 10 clear the $100,000 mark, and not all voted No: 
+
+```{r showTop10D, echo=FALSE, eval=TRUE, warning=FALSE, message=FALSE, cache=TRUE}
+rep <- subset(df,Party=='R')
+dem <- subset(df,Party=='D')
+head(dem[order(-dem$Amount),],n=10)
+```
+
+Among their Republican counterparts, all clear the $100,000 mark, only four of them are below the $150,000 mark, and all voted No:
+
+```{r showTop10R, echo=FALSE, eval=TRUE, warning=FALSE, message=FALSE, cache=TRUE}
+head(rep[order(-rep$Amount),],n=10)
+```
+
+This is in line with what the graph of Model 2 suggests about Republicans: they vote No with high expected probability and low uncertainty around it (shorter red bars) at high levels of funding.
+
+At low levels of funding the bars overlap in Model 2. Basically, this is another way of saying that money talks: you cannot pay peanuts. If you try, you won't be able to tell Republicans from Democrats. Absent monetary encouragement, their principles will get the better of them both. Whatever your industry, it is guaranteed that any outcome that you find unpleasant can be validated by some subset of each party's basic philosophical tenets. Don't risk it. Pay up.
+
+How did the security-industrial complex do?
+-------------------------------------------
+
+Security and defense industry interests paid this House of Representatives a total of $`r prettyNum(sum(df$Amount),big.mark=',')`, which works out to $`r prettyNum(sum(df$Amount)/nrow(df),big.mark=',')` per member among the `r nrow(df)` US Representatives who voted on the Amash amendment.
+
+According to simulations based on Model 1, at $30,000 per head the average probability of a Yes vote is `r sum(p1.No$Yes[p1.No$Amount==30000]*table(df$Party))/sum((table(df$Party)))` while that of a No vote is `r sum(p1.No$No[p1.No$Amount==30000]*table(df$Party))/sum((table(df$Party)))`. These are weighted averages by party. At this amount the within-party split between Yes and No probabilities strongly favors a Yes on the Democratic side, as expected based on their higher price for a No:
+
+```{r showBalanceM1, echo=FALSE, eval=TRUE, warning=FALSE, message=FALSE, cache=TRUE}
+subset(p1.No,Amount==30000)[,c('Yes','No')]
+```
+
+Model 2 pegs the $30,000 probability of a Yes vote at `r sum(p2.No$Yes[p2.No$Amount==30000]*table(df$Party))/sum((table(df$Party)))` and that of a No vote at `r sum(p2.No$No[p2.No$Amount==30000]*table(df$Party))/sum((table(df$Party)))` with the intra-party split between Yes and No probabilites as shown below (with Democrats again favoring a Yes):
+
+```{r showBalanceM2, echo=FALSE, eval=TRUE, warning=FALSE, message=FALSE, cache=TRUE}
+subset(p2.No,Amount==30000)[,c('Yes','No')]
+```
+
+Both models show that a No outcome relies on a Republican majority at these funding levels. $30,000 per head does not clear the threshold at which Democrats will turn from likely Yes to likely No. But it gets even worse:  Republicans were overpaid and Democrats were underpaid. The split by party is tabulated below:
+
+```{r paymentsMade, echo=FALSE, eval=TRUE, warning=FALSE, message=FALSE, cache=TRUE}
+D.paid <- mean(df$Amount[df$Party=='D'])
+R.paid <- mean(df$Amount[df$Party=='R'])
+D.ct   <- nrow(df[df$Party=='D',])
+R.ct   <- nrow(df[df$Party=='R',])
+foo <- rbind(c(D.ct,D.paid),c(R.ct,R.paid))
+colnames(foo) <- c('Representatives','$/head')
+rownames(foo) <- c('Democrats','Republicans')
+print(format(foo,big.mark=',',digits=1), quote=F)
+```
+
+The difference suggests even more strongly that the Amash amendment outcome would not have happened without a strong showing by the president's Republican friends. It was their majority, not cleverly structured industry funding, that carried the day. That's OK. Now you know how to do it.
+
+Conclusion
+----------
+
+Congratulations, security and defense industry, for having won a No outcome on July 24. What saved your bacon, though, was a Republican majority. You overpaid your friends and generally mistreated those indifferent US Representatives who may have been persuaded with a bit of campaign help. Lucky for you, you had enough friends.
+
+However, a permanent Republican majority is hardly guaranteed. Spending will have to increase if close calls like the Amash amendment vote are to be avoided in the future. The good news is that the increase will not be very high if it is balanced judiciously: pay your friends less -- realistically, where else will they go? -- and the savings can be put toward getting the attention of the indifferent. 
+
+Use the knobby sticks in the confidence interval pictures for a rough idea. You want to pay Republicans the lowest amount that puts the middle of the red stick above the 50% mark. That, in optimization-speak, would be your objective function. But what matters to you, I am sure, is only the information that this amount seems to be $10,000 to $20,000 per head depending on which of the two models you believe. 
+
+You also want to pay the Democrats the lowest amount that puts the middle of the blue stick above the 50% mark. That can be as little as $40,000 according to Model 1 (the 9^th blue stick counting from 0), or as high as $65,000 per head if you go by Model 2. This would have cost you between $`r prettyNum(nrow(subset(df,Party=='D'))*40000+nrow(subset(df,Party=='R'))*15000,big.mark=',')` and $`r prettyNum(nrow(subset(df,Party=='D'))*65000+nrow(subset(df,Party=='R'))*20000,big.mark=',')`  over the `r nrow(df)` US Representatives who cast a vote on the Amash amendment. 
+
+The midpoint of this range is higher than you actually paid, but the goal of this paper is not to show you that you could have paid less. Rather, the aim is to figure out how much will get you a No outcome with a higher than 50% probability regardless of which party has the majority.

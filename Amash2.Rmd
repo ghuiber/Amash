@@ -1,0 +1,199 @@
+'Defund the NSA': a little R code for following the money
+=========================================================
+
+Introduction
+------------
+
+The 'Defund the NSA' amendment by Rep. Justin Amash came up for a vote on July 24, 2013 and failed. The specifics are [here](http://www.govtrack.us/congress/votes/113-2013/h412). The issue can be put simply: a No vote was a vote to continue the expansion of the surveillance state, and a Yes vote was a vote to curb the US government's ability to spy on Americans. The relative merits of either position are not the concern of this article.
+
+On July 26, Wired ran a [story](http://www.wired.com/threatlevel/2013/07/money-nsa-vote/) accompanied by [a summarized data set](http://s3.documentcloud.org/documents/741074/amash-amendment-vote-maplight.pdf) which showed that the No votes came from people who received a lot more money, on average, from the security-industrial complex. The authors of the analysis, an organization called [MapLight](http://maplight.org), made the complete data set -- with specific donors, amounts, time stamps and recipients -- available in .csv [here](http://bit.ly/11IhEtY). 
+
+Daniel G. Newman, MapLight's president, quoted in the story, outlined the potential conflict of interests nicely: American citizens might like their privacy, but defense and security industry donors want to do business with the surveillance state; representatives are supposed to represent constituents, but their campaign cash comes from donors. 
+
+Was the defeat of the Amash amendment bought with money? The finding that Wired reported is clear enough: the [bar chart](http://pllqt.it/RN5kbM) in the middle of the article shows that No votes came from people who collected more than twice, on average, what people who voted Yes did. However, averages do not tell the whole story. 
+
+```{r setUp, echo=FALSE, eval=TRUE, warning=FALSE, message=FALSE, cache=TRUE}
+library(ggplot2)
+library(plyr)
+library(scales)
+library(coin)
+# Read raw data
+df <- read.csv('amashvotevsmoney.csv',header=T,sep="|",stringsAsFactors=F,strip.white=T)
+```
+
+A pair of density plots shows that both No and Yes votes came from large numbers of people who received little money from the security-industrial complex, and that there were a few large recipients on both sides:
+
+```{r cleanUp, echo=FALSE, eval=TRUE, warning=FALSE, message=FALSE, cache=TRUE, fig.width=7, fig.height=6}
+# Clean up a bit
+df$Amount <- as.numeric(gsub("\\$|,","", df$Amount)) # make dollars numeric
+names(df)[3] <- 'District'                           # shorten district name
+df <- df[df$Vote!='Not Voting',]                     # drop abstainers (I want 2 categories for Wilcoxon rank-sum test)
+# Draw density plots with overlaid medians
+cdf.median <- ddply(df, .(Vote), summarize, amt.median=median(Amount))
+cdf.mean <- ddply(df, .(Vote), summarize, amt.mean=mean(Amount))
+
+# Overlay means onto the distribution plots. You could equally well do medians as computed above.
+ggplot(df, aes(x=Amount, fill=Vote)) + geom_density(alpha=.3) + geom_vline(data=cdf.mean, aes(xintercept=amt.mean,  color=Vote), size=1) + scale_x_continuous(labels=comma) + scale_y_continuous(labels=comma) + ggtitle("Distribution of security-industrial complex contributions by vote \n vertical lines at the means")
+```
+
+The quantity of interest
+-----------------------
+
+Suppose that the amount received from defense and security industry donors can help approximate how likely the conflict of interests is, and which way it cuts: better-funded representatives who voted No risk ill-representing their privacy-minded constituents, while better-funded representatives who voted Yes risk losing money from their defense and security industry donors. 
+
+Now suppose also that we only care about the risk of ill-representation *to voters who wanted a Yes* on the Amash amendment: the people who would prefer to curb the ability of the NSA to spy on Americans wholesale. I do not know who these people are. I do know that they do not include the President of the United States, because he is [on the record](http://www.businessinsider.com/amash-amendment-nsa-white-house-obama-veto-2013-7) for having wanted a No.
+
+Now: a positive difference in funding between No votes and Yes votes, since the funding comes from an industry that wants a No, should be indicative of the risk of ill-representation to voters who want a Yes. This is because the security-industrial complex will get a No for free from voters who want a No, but it will have to help out the campaigns of representatives whose constituencies might listen to challengers who propose a Yes.
+
+Just to make it extra clear: the sign and size of the funding gap is not a method for exposing evidence of ill-representation. It is simply a measure of its risk. In other words, I won't show you a smoking gun. I am just suggesting where to look if you're trying to find one.
+
+So, with the above clarifications out of the way, I have two questions. First, which of the two parties is more likely to please its defense and security industry donors at the expense of its privacy-minded constituents, nationally? And second, how about my home state of North Carolina?
+
+The statistical test
+--------------------
+
+One way to tell whether the Yes and No groups within each party are significantly different in how much they collected from industry donors is to use a non-parametric test that compares medians: the Wilcoxon rank sum test (also known as the Mann-Whitney U test). This works at the national level. For North Carolina, the counts of representatives are small enough that they will have to speak for themselves. 
+
+I am proposing a non-parameteric test because, as you can see in the density plot above, you can hardly assume that donations from the security-industrial complex are normally distributed across US representatives. Non-parametric tests do not require distributional assumptions, with the added advantage for this exercise that they have somewhat lower power as a result. In other words, I may miss some differences in funding, so my exercise can't be accused of stacking the deck in favor of finding them.
+
+My code and data set are available on request. You may use them to look up your own state representatives.
+
+The going rate for a No, by party
+---------------------------------
+
+```{r goingPrice, echo=FALSE, eval=TRUE, warning=FALSE, message=FALSE, cache=TRUE}
+# Relative average prices: how much for a No for Democrats vs. Republicans, nationally
+getGoingPrice <- function(vote) {
+   big  <- df[df$Vote==vote,]
+   r    <- big[big$Party=='R',]
+   d    <- big[big$Party=='D',]
+   m.r  <- c(mean(big$Amount),mean(r$Amount),mean(d$Amount))
+   sd.r <- c(sd(big$Amount),sd(r$Amount),sd(d$Amount))
+   tab  <- rbind(m.r,sd.r)
+   colnames(tab) <- paste("Voted",vote,c("All","Republicans","Democrats"),sep=".")
+   rownames(tab) <- c("Mean","St.dev.")
+   w    <- wilcox.test(d$Amount,r$Amount)
+   c    <- list(tab,w)
+   names(c) <- c("summary","wilcoxon.ranksum")
+   return(c)
+}
+
+All.Yes  <- getGoingPrice('Yes')
+All.No   <- getGoingPrice('No')
+```
+
+To the extent that No votes were for sale, Republicans charged more on average. The mean and standard deviation of amounts collected from the security-industrial complex in the No camp are tabulated below:
+
+```{r yesTab, echo=FALSE}
+print(format(t(All.No$summary),big.mark=",",digits=1),quote=F)
+```
+
+There is no significant difference in the amounts collected between the two parties on the Yes side:
+
+```{r noTab, echo=FALSE}
+print(format(t(All.Yes$summary),big.mark=",",digits=1),quote=F)
+#print(All.Yes$wilcoxon.ranksum)
+```
+
+How about intra-party differences between the Yes and No camps?
+---------------------------------------------------------------
+
+```{r YesVsNo, echo=FALSE, eval=TRUE, warning=FALSE, message=FALSE, cache=TRUE}
+getDifference <- function(party) {
+   require(coin)
+   d <- df[df$Party==party,]
+   yes   <- d[d$Vote=='Yes',]
+   no    <- d[d$Vote=='No',]
+   yes.r <- c(dim(yes)[1],mean(yes$Amount),sd(yes$Amount))
+   no.r  <- c(dim(no)[1],mean(no$Amount),sd(no$Amount))
+   tab  <- rbind(yes.r,no.r)
+   colnames(tab) <- c("Votes","Mean","St.dev")
+   rownames(tab) <- paste(party,c("Yes","No"),sep=".")
+   w.R     <- wilcox.test(d$Amount~d$Vote)
+   w.Stata <- wilcox_test(d$Amount~as.factor(d$Vote))
+   c       <- list(tab,w.R,w.Stata)
+   names(c) <- c("summary","wilcoxon.R","wilcoxon.Stata")
+   return(c)   
+}
+R.Difference <- getDifference('R')
+D.Difference <- getDifference('D')
+```
+
+Republican No votes came in sufficient numbers to defeat the Amash amendment, but at a price:
+
+```{r repTab, echo=FALSE}
+print(format(R.Difference$summary,big.mark=",",digits=4),quote=F)
+```
+
+The difference between the two sides' takes from the security-industrial complex is gaping on the Republican side. You will not be surprised, then, to see that it is statistically significant. Below are the Wilcoxon test results:
+
+```{r repTabTest, echo=FALSE}
+R.Difference$wilcoxon.R
+```
+
+Now it may well be that every Republican representative voted with his or her constituents' wishes in mind: those who voted Yes would have represented small-government types, while those who voted No presumably came from districts with security-hawk majorities; but that would leave the wide difference in funding unexplained. After all, the industry that wants a No will get it for free if that's also what the voters want. Why help out where no help is needed? 
+
+The president's Democratic friends -- those who voted No on the Amash amendment, in line with his wishes -- appear to be representing constituencies who are okay with wholesale spying on principle. They may look like they're out to please their industry donors if you only consider the averages, but the difference is not large enough to clear the Wilcoxon test hurdle:
+
+```{r demTab, echo=FALSE}
+print(format(D.Difference$summary,big.mark=",",digits=4),quote=F)
+D.Difference$wilcoxon.R
+```
+
+So, at the national level the Republicans look like they have a higher risk to be pleasing their donors at the expense of their privacy-minded constituents' preferences. The Democrats all seem to be representing their constituencies fairly: if you liked the Amash amendment, voted Democratic, and your representative voted No, you have no reason to suspect that your man (or woman) was bought. You may simply be living among the wrong kind of Democrats.
+
+How about North Carolina? 
+-------------------------
+
+```{r getAmount, echo=FALSE, eval=TRUE, warning=FALSE, message=FALSE, cache=TRUE}
+# Mean and SD by party, by vote, overall and for a state of interest
+getAmount <- function(vote,party,state) {
+   big <- df[df$Vote==vote & df$Party==party,]
+   lil <- big[grep(state,big$District),]
+   a <- c(mean(big$Amount, na.rm=T),median(big$Amount, na.rm=T),sd(big$Amount, na.rm=T),dim(big)[1])
+   b <- c(mean(lil$Amount, na.rm=T),median(lil$Amount, na.rm=T),sd(lil$Amount, na.rm=T),dim(lil)[1])
+   d <- rbind(a,b)
+   rownames(d) <- paste(party,"Voted",vote,c("US",state),sep=".")
+   colnames(d) <- c("Mean","Median","St.dev.","Votes")
+   w <- wilcox.test(big$Amount,lil$amount)
+   c <- list()
+   c$list             <- lil
+   c$wilcoxon.ranksum <- w
+   c$summary          <- d
+   return(c)
+}
+NC.D.Yes <- getAmount('Yes','D','NC')
+NC.R.Yes <- getAmount('Yes','R','NC')
+NC.D.No  <- getAmount('No','D','NC')
+NC.R.No  <- getAmount('No','R','NC')
+```
+
+The North Carolina Republicans who support Big Brother do it basically for free, having collected a mere  `r paste("$",format(NC.R.No$summary[2,1],big.mark=",",digits=4),sep="")` on average from defense and security industry donors:
+
+```{r noRepNC, echo=FALSE}
+print(format(NC.R.No$summary,big.mark=",",digits=4),quote=F)
+```
+
+But boy, do North Carolina Democrats compensate for it:
+
+```{r noDemNC, echo=FALSE}
+print(format(NC.D.No$summary,big.mark=",",digits=4),quote=F)
+```
+
+An average of `r paste("$",format(NC.D.No$summary[2,1],big.mark=",",digits=4),sep="")` in defense and security industry contributions is a lot of money. I wonder who got how much?
+
+```{r, echo=FALSE}
+print(format(NC.D.No$list,digits=4,big.mark=","),row.names=F)
+```
+
+Are there any US representatives from North Carolina who would rather not have our government spy on us? Yes, there are. Mostly they are Republicans:
+
+```{r yesNC, echo=FALSE}
+print(format(rbind(NC.R.Yes$list,NC.D.Yes$list),digits=1,big.mark=","),row.names=F)
+```
+
+I expect that Mr. Walter Jones will have heard by now from his donors. By contrast, Mr. Mel Watt, the lone Democratic Yes voter, makes the security and defense industry's support for his fellow North Carolina Democrats look particularly inspired.
+
+The North Carolina picture is the opposite of the national one: here Democrats are the ones who appear to be at higher risk of pleasing their donors at the expense of their constituents. The funding gap is much wider as well: compare `r paste("$",format(NC.D.No$summary[2,1],big.mark=",",digits=4),sep="")` on average for a No versus `r paste("$",format(NC.D.Yes$summary[2,1],big.mark=",",digits=4),sep="")` for a Yes among North Carolina Democrats, to `r paste("$",format(R.Difference$summary[2,2],big.mark=",",digits=4),sep="")` for a No versus `r paste("$",format(R.Difference$summary[1,2],big.mark=",",digits=4),sep="")` for a Yes, on average, among Republicans nationally. 
+
+For Mr. McIntyre, a [Blue Dog Democrat](http://en.wikipedia.org/wiki/Blue_Dog_Coalition), this may not be a problem. His take from the security-industrial complex may very well match the hawkish preferences of his constituency. But I expect that Mr. Price will have some explaining to do when he meets with his progressive voters in the Research Triangle next time.
