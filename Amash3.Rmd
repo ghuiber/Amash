@@ -4,7 +4,7 @@
 Introduction
 ------------
 
-Having found [sufficient evidence](http://rpubs.com/ghuiber/DefundTheNSA) that money helps, security and defense industry interests might appreciate an estimate of how much per US Representative they should expect to pay for avoiding such close calls as the Amash amendment vote in the future. This might be useful because though peace of mind may well be priceless in the abstract, nobody likes to overpay.
+Having found [sufficient evidence](http://ghuiber.github.io/Amash/Amash2.html) that money helps, security and defense industry interests might appreciate an estimate of how much per US Representative they should expect to pay for avoiding such close calls as the Amash amendment vote in the future. This might be useful because though peace of mind may well be priceless in the abstract, nobody likes to overpay.
 
 So, at the instigation of [Bryan Shepherd](https://twitter.com/cozymandias), who gave me the idea, I propose a recipe for influence-buying spend optimization. The quest is not hopeless because, as my simulations below show, US Representatives' response to campaign help is positive and robust. The recipe can be adapted for any special interest, any issue. The Amash amendment vote and the the security-industrial complex are but a working example.
 
