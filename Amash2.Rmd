@@ -56,7 +56,7 @@ One way to tell whether the Yes and No groups within each party are significantl
 
 I am proposing a non-parameteric test because, as you can see in the density plot above, you can hardly assume that donations from the security-industrial complex are normally distributed across US representatives. Non-parametric tests do not require distributional assumptions, with the added advantage for this exercise that they have somewhat lower power as a result. In other words, I may miss some differences in funding, so my exercise can't be accused of stacking the deck in favor of finding them.
 
-My code and data set are available on request. You may use them to look up your own state representatives.
+My code and data set are [here on GitHub](https://github.com/ghuiber/Amash). You may use them to look up your own state representatives.
 
 The going rate for a No, by party
 ---------------------------------
