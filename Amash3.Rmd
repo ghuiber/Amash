@@ -61,8 +61,8 @@ getSims <- function(z.out) {
    x.R <- setx(z.out,Party='R',Amount=seq(0,maxd,incr))
    x.D <- setx(z.out,Party='D',Amount=seq(0,maxd,incr))
    s.out <- sim(z.out,x=x.D,x1=x.R)
-   s.D <- sim(z.out,x=x.D,x1=x.R)
-   s.R <- sim(z.out,x=x.R,x1=x.D)
+   s.D   <- sim(z.out,x=x.D,x1=x.R)
+   s.R   <- sim(z.out,x=x.R,x1=x.D)
    c <- list(x.R,x.D,s.out,s.D,s.R)
    names(c) <- c('x.R','x.D','s.out','s.D','s.R')
    return(c)
@@ -73,7 +73,7 @@ m2 <- getSims(z2.out)
 
 We care about the increase in willingness to vote No -- mapped on the vertical axis as the probability of a No vote -- in response to an increase in campaign help -- mapped on the horizontal axis as dollar amounts per US Representative, from 0 to $`r formatC(maxd,format='fg',big.mark=',')` in increments of $`r prettyNum(incr,big.mark=',')`. 
 
-If it is true that money cannot buy influence, the graph should be a flat horizontal line at whatever the average probability of a No vote is by party: more funding won't change this probability. The data, however, suggests that a more cynical worldview may well be in order.
+If it were true that money cannot buy influence, the graph would be a flat horizontal line at whatever the average probability of a No vote is by party: more funding won't change this probability. Wouldn't that be nice?
 
 I will use the [Zelig](http://gking.harvard.edu/zelig) package to simulate some funding scenarios under both models, and the [ggplot2](http://ggplot2.org/) package to plot the response curves.
 
@@ -147,7 +147,7 @@ epic2
 
 By assumption, this $30,000 difference between Democrats and Republicans is held constant in Model 1, and you can see that the two curves track each other at about this horizontal distance. In other words, beyond the baseline, a dollar buys about the same amount of influence in both parties. 
 
-Model 2 says that Democrats are far more expensive: not only are they less likely to vote No at baseline, but Democratic gains in the probability of a No vote in response to funding grow more slowly. The average difference is far larger than the $30,000 estimated by Model 1 and widening. The price to flip a Republican is larger than $10,000, and a Democrat will demand more than $50,000. 
+Model 2 says that Democrats are more expensive: not only are they less likely to vote No at baseline, but Democratic gains in the probability of a No vote in response to funding grow more slowly. The average difference is larger than the $30,000 estimated by Model 1 and widening. The price to flip a Republican looks to be about $15,000, and a Democrat will cost something more than $50,000. 
 
 How sure are we about this?
 ---------------------------
@@ -238,16 +238,23 @@ How did the security-industrial complex do?
 
 Security and defense industry interests paid this House of Representatives a total of $`r prettyNum(sum(df$Amount),big.mark=',')`, which works out to $`r prettyNum(sum(df$Amount)/nrow(df),big.mark=',')` per member among the `r nrow(df)` US Representatives who voted on the Amash amendment.
 
-According to simulations based on Model 1, at $30,000 per head the average probability of a Yes vote is `r sum(p1.No$Yes[p1.No$Amount==30000]*table(df$Party))/sum((table(df$Party)))` while that of a No vote is `r sum(p1.No$No[p1.No$Amount==30000]*table(df$Party))/sum((table(df$Party)))`. These are weighted averages by party. At this amount the within-party split between Yes and No probabilities strongly favors a Yes on the Democratic side, as expected based on their higher price for a No:
-
-```{r showBalanceM1, echo=FALSE, eval=TRUE, warning=FALSE, message=FALSE, cache=TRUE}
-subset(p1.No,Amount==30000)[,c('Yes','No')]
+```{r getProbs30k, echo=FALSE, eval=TRUE, warning=FALSE, message=FALSE, cache=TRUE}
+model1Yes <- sum(p1.No$Yes[p1.No$Amount==30000]*table(df$Party))/sum((table(df$Party)))
+model1No  <- sum(p1.No$No[p1.No$Amount==30000]*table(df$Party))/sum((table(df$Party)))
+model2Yes <- sum(p2.No$Yes[p2.No$Amount==30000]*table(df$Party))/sum((table(df$Party)))
+model2No  <- sum(p2.No$No[p2.No$Amount==30000]*table(df$Party))/sum((table(df$Party)))
 ```
 
-Model 2 pegs the $30,000 probability of a Yes vote at `r sum(p2.No$Yes[p2.No$Amount==30000]*table(df$Party))/sum((table(df$Party)))` and that of a No vote at `r sum(p2.No$No[p2.No$Amount==30000]*table(df$Party))/sum((table(df$Party)))` with the intra-party split between Yes and No probabilites as shown below (with Democrats again favoring a Yes):
+According to simulations based on Model 1, at $30,000 per head the average probability of a Yes vote is `r round(model1Yes,digits=2)` while that of a No vote is `r round(model1No,digits=2)`. These are weighted averages by party. At this amount the within-party split between Yes and No probabilities strongly favors a Yes on the Democratic side, as expected based on their higher price for a No:
+
+```{r showBalanceM1, echo=FALSE, eval=TRUE, warning=FALSE, message=FALSE, cache=TRUE}
+round(subset(p1.No,Amount==30000)[,c('Yes','No')],digits=2)
+```
+
+Model 2 pegs the $30,000 probability of a Yes vote at `r round(model2Yes,digits=2)` and that of a No vote at `r round(model2No,digits=2)` with the intra-party split between Yes and No probabilites as shown below (with Democrats again favoring a Yes):
 
 ```{r showBalanceM2, echo=FALSE, eval=TRUE, warning=FALSE, message=FALSE, cache=TRUE}
-subset(p2.No,Amount==30000)[,c('Yes','No')]
+round(subset(p2.No,Amount==30000)[,c('Yes','No')],digits=2)
 ```
 
 Both models show that a No outcome relies on a Republican majority at these funding levels. $30,000 per head does not clear the threshold at which Democrats will turn from likely Yes to likely No. But it gets even worse:  Republicans were overpaid and Democrats were underpaid. The split by party is tabulated below:
