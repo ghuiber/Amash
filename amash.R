@@ -98,27 +98,11 @@ print(format(No$summary,big.mark=",",digits=4),quote=F)
 df$Vote  <- factor(df$Vote, levels=c('Yes','No'))
 df$Party <- factor(df$Party)
 
-# Pure Zelig 5
-z1 <- zlogit$new()
-z1$zelig(Vote ~ Party + Amount, data=df)
-z1$setrange(Party='R', Amount=rng)
-z1$setrange1(Party='D', Amount=rng)
-z1$sim()
-plot.ci(z1, ci=95)
-
-z2 <- zlogit$new()
-z2$zelig(Vote ~ Party * Amount, data=df)
-z2$setrange(Party='R', Amount=rng)
-z2$setrange1(Party='D', Amount=rng)
-z2$sim()
-plot.ci(z2, ci=95)
-
-m1 <- z1$sim.out
-m2 <- z2$sim.out
-
 #' Pick out data for drawing ggplot2 version of plot.ci().
+#' 
 #' Need a series of of median expected values bracketed by
 #' the bottom and the top of a confidence interval, ci.
+#' 
 #' @param x a zlogit$sim.out object with range and range1
 #' @param ci width of the confidence interval
 getRibbon <- function(x,ci=.95) {
@@ -151,42 +135,130 @@ getRibbon <- function(x,ci=.95) {
   out$Party <- factor(out$Party,labels=parties)
   return(out)
 }
+
+#' Minimum and safe levels of pay
+#' 
+#' You need to pick a level of pay that clears
+#' the .5 probability threshold either at the
+#' mid-point of the range (minimum) or at the
+#' bottom of the range. This is a "safe" level
+#' of pay that promises a favorable vote with
+#' a probability P()=ci, where default ci=95%.
+#' The latter may not be attainable.
+#' 
+#' @param m  an object returned by getRibbon()
+getPay <- function(m) {
+  mycols  <- as.data.frame(myRedBlue)
+  colnames(mycols) <- 'Color'
+  mycols$Party <- rownames(mycols)
+  minpay  <- (subset(m,Median>.5) %>% 
+                group_by(Party) %>% 
+                slice(which.min(Median)))
+  minpay  <- merge(minpay,mycols)
+  safepay <- (subset(m,Low>.5) %>% 
+                group_by(Party) %>% 
+                slice(which.min(Low)))
+  safepay <- merge(safepay,mycols)
+  out <- list()
+  out[['min']]  <- minpay
+  out[['safe']] <- safepay
+  return(out)
+}
   
-# Expected P(No) graph
-drawEPic <- function(m,mname) {
+#' Expected P(No) graph
+#' 
+#' Draws response curves over a given funding range
+#' with vertical bars at minimum or safe levels of
+#' pay that would produce a No vote with P(No)>.5
+#' for each party.
+#' 
+#' @param m an object returned by getRibbon()
+#' @param mname name of the model for prettier graph titles
+#' @param p an element from c('min','safe')
+drawEPic <- function(m,mname,p='min') {
+   pay <- getPay(m)[[p]] 
+   xl  <- 'Funding from security and defense interests'
+   yl  <- 'Expected P(votes No)'
    pic <- ggplot(data=m, aes(x=Amount, y=Median, group=Party)) + 
      geom_ribbon(aes(ymin=Low,ymax=High,fill=Party),alpha=.2) +
-     geom_line(aes(color=Party)) + xlab('Funding from security and defense industry') + 
-     ylab('Expected P(votes No)') + 
-     ggtitle(paste('Expected probability of a No vote by party,',mname,sep=' '))
+     geom_line(aes(color=Party)) + xlab(xl) + 
+     ylab(yl) + ggtitle(mname)
    pic <- pic + scale_colour_manual(values=myRedBlue)
+   pic <- pic + geom_segment(data=pay,
+                             aes(x = Amount,
+                                 y = Low,
+                                 xend = Amount,
+                                 yend = High),
+                             color=pay$Color,
+                             size=2) +
+                 geom_hline(aes(yintercept=.5),alpha=.2) +
+                 geom_text(data=pay, aes(x = Amount,
+                                         y = .95*Low,
+                                         label = paste('$',
+                                                       round(Amount/1000),
+                                                       'K',sep='')))
    return(pic)
 }
 
-m1r   <- getRibbon(m1)
-m2r   <- getRibbon(m2)
-epic1 <- drawEPic(m1r,'Model 1')
-epic2 <- drawEPic(m2r,'Model 2')
+# Test code
+# m1r   <- getRibbon(m1)
+# m2r   <- getRibbon(m2)
+# epic1 <- drawEPic(m1r,'Model 1')
+# epic2 <- drawEPic(m2r,'Model 2')
 
-# Now add vertical bars to the plots where the
-# amount is enough to cross the .5 probability
-# threshold for each party.
-m1pair <- (subset(m1r,Median>.5 & Median<.53) %>% group_by(Party) %>% slice(which.min(Median)))
-m2pair <- (subset(m2r,Median>.5 & Median<.53) %>% group_by(Party) %>% slice(which.min(Median)))
-pic1   <- epic1 + geom_segment(data=m1pair,
-                               aes(x = Amount,
-                                   y = Low,
-                                   xend = Amount,
-                                   yend = High),
-                               color=myRedBlue,
-                               size=2) +
-                  geom_hline(aes(yintercept=.5),alpha=.2)
-pic2   <- epic2 + geom_segment(data=m2pair,
-                               aes(x = Amount,
-                                   y = Low,
-                                   xend = Amount,
-                                   yend = High),
-                               color=myRedBlue,
-                               size=2) +
-                  geom_hline(aes(yintercept=.5),alpha=.2)
+# # Pure Zelig 5
+# z1 <- zlogit$new()
+# z1$zelig(Vote ~ Party + Amount, data=df)
+# z1$setrange(Party='R', Amount=rng)
+# z1$setrange1(Party='D', Amount=rng)
+# z1$sim()
+# # plot.ci(z1, ci=95)
+# 
+# z2 <- zlogit$new()
+# z2$zelig(Vote ~ Party * Amount, data=df)
+# z2$setrange(Party='R', Amount=rng)
+# z2$setrange1(Party='D', Amount=rng)
+# z2$sim()
+# # plot.ci(z2, ci=95)
+# 
+# m1 <- z1$sim.out
+# m2 <- z2$sim.out
 
+#' Big wrapper
+#' 
+#' You set whether you want minimum or safe pay levels,
+#' and at which % confidence safe. You get a picture
+#' @param x
+#' @param ci
+#' @param p
+getBigPicture <- function(model='Model 1',ci=.95,p='min') {
+  # which model: common slope vs. interaction
+  fml <<- 'Vote ~ Party + Amount'
+  mdl <- 'Model 1: baseline difference by party, but same response to funding'
+  if(model=='Model 2') {
+    fml <<- 'Vote ~ Party * Amount'
+    mdl <- 'Model 2: both baseline and response to funding are different by party'
+  }
+  mdl <- paste(mdl,'\n',sep='')
+  # which kind of pay level
+  pl <- 'minimum'
+  if(p=='safe') {
+    pl <- paste(ci*100,'% safe',sep='')
+  }
+  sb <- paste(mdl,'Funding level: ',pl,sep='')
+  ma <- paste('Expected probability of a No vote by party\n',sb,sep='')
+  # estimate model, simulate expected probability
+  z5 <- zlogit$new()
+  z5$zelig(formula=as.formula(fml), data=df)
+  z5$setrange(Party='R', Amount=rng)
+  z5$setrange1(Party='D', Amount=rng)
+  z5$sim()
+  # extract ribbon data
+  mr <- getRibbon(z5$sim.out,ci=ci)
+  # draw picture
+  pic <- drawEPic(mr,mname=ma,p=p)
+  return(pic)
+}
+
+m1.95.min <- getBigPicture()
+m2.80.safe <- getBigPicture(model='Model 2',ci=.8,p='safe')
