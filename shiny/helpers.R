@@ -4,97 +4,10 @@
 # -- amashvotevsmoney.csv
 # Complete data : http://bit.ly/11IhEtY
 # -- amashbig.csv
-rm(list=ls(all=TRUE))
 library("coin")
 library("Zelig")
 library("ggplot2")
 library("dplyr")
-
-# Read raw data
-df <- read.csv('amashvotevsmoney.csv',header=T,sep="|",stringsAsFactors=F,strip.white=T)
-bigset <- read.csv('amashbig.csv',header=T,stringsAsFactors=F)
-
-# Clean up a bit
-df$Amount    <- as.numeric(gsub("\\$|,","", df$Amount)) # make dollars numeric
-names(df)[3] <- 'District' # shorten district name
-df       <- df[df$Vote!='Not Voting',] # drop abstainers (want 2 categories for Wilcoxon rank-sum test)
-df$Vote  <- factor(df$Vote, levels=c('Yes','No'))
-df$Party <- factor(df$Party)
-
-incr <- 5000
-maxd <- 200000
-rng  <- seq(0,maxd,incr)
-
-# Colorblind-safe red/blue hues for 
-# Republican/Democrat lines
-myRedBlue        <- c("#ef8a62", "#67a9cf")
-parties          <- c('R','D') # in this order
-names(myRedBlue) <- parties
-
-# # Relative average prices: how much for a No for Democrats vs. Republicans, nationally
-# getGoingPrice <- function(vote) {
-#    big  <- df[df$Vote==vote,]
-#    r    <- big[big$Party=='R',]
-#    d    <- big[big$Party=='D',]
-#    m.r  <- c(mean(big$Amount),mean(r$Amount),mean(d$Amount))
-#    sd.r <- c(sd(big$Amount),sd(r$Amount),sd(d$Amount))
-#    tab  <- cbind(m.r,sd.r)
-#    rownames(tab) <- c("All","Republicans","Democrats")
-#    colnames(tab) <- c("Mean","SD")
-#    w    <- wilcox.test(d$Amount,r$Amount)
-#    c    <- list(tab,w)
-#    names(c) <- c("summary","wilcoxon.ranksum")
-#    return(c)
-# }
-# 
-# # How much for a No vs. Yes within a party?
-# getDifference <- function(party) {
-#    require("coin")
-#    d <- df[df$Party==party,]
-#    yes   <- d[d$Vote=='Yes',]
-#    no    <- d[d$Vote=='No',]
-#    yes.r <- c(nrow(yes),mean(yes$Amount),sd(yes$Amount))
-#    no.r  <- c(nrow(no),mean(no$Amount),sd(no$Amount))
-#    tab  <- rbind(yes.r,no.r)
-#    colnames(tab) <- c("Votes","Mean","St.dev")
-#    rownames(tab) <- paste(party,c("Yes","No"),sep=".")
-#    w.R     <- wilcox.test(d$Amount~d$Vote)
-#    w.Stata <- wilcox_test(d$Amount~as.factor(d$Vote))
-#    c       <- list(tab,w.R,w.Stata)
-#    names(c) <- c("summary","wilcoxon.R","wilcoxon.Stata")
-#    return(c)   
-# }
-# 
-# # Mean and SD by party, by vote, overall and for a state of interest
-# getAmount <- function(vote,party,state) {
-#    big <- df[df$Vote==vote & df$Party==party,]
-#    lil <- big[grep(state,big$District),]
-#    a <- c(mean(big$Amount, na.rm=T),median(big$Amount, na.rm=T),sd(big$Amount, na.rm=T),nrow(big))
-#    b <- c(mean(lil$Amount, na.rm=T),median(lil$Amount, na.rm=T),sd(lil$Amount, na.rm=T),nrow(lil))
-#    d <- rbind(a,b)
-#    rownames(d) <- c("US",state)
-#    colnames(d) <- c("Mean","Median","SD",paste(party,vote,sep="."))
-#    w <- wilcox.test(big$Amount,lil$amount)
-#    c <- list()
-#    c$list             <- lil
-#    c$wilcoxon.ranksum <- w
-#    c$summary          <- d
-#    return(c)
-# }
-# 
-# # Call them all
-# R.Difference <- getDifference('R')
-# D.Difference <- getDifference('D')
-# Yes  <- getGoingPrice('Yes')
-# No   <- getGoingPrice('No')
-# NC.D.Yes <- getAmount('Yes','D','NC')
-# NC.R.Yes <- getAmount('Yes','R','NC')
-# NC.D.No  <- getAmount('No','D','NC')
-# NC.R.No  <- getAmount('No','R','NC')
-# 
-# # Show it pretty
-# print(format(NC.R.No$summary,big.mark=",",digits=4),quote=F)
-# print(format(No$summary,big.mark=",",digits=4),quote=F)
 
 # Now estimate prob of voting No as a function of Party and Amount.
 
@@ -199,30 +112,6 @@ drawEPic <- function(m,mname,p='min') {
                                                        'K',sep='')))
    return(pic)
 }
-
-# Test code
-# m1r   <- getRibbon(m1)
-# m2r   <- getRibbon(m2)
-# epic1 <- drawEPic(m1r,'Model 1')
-# epic2 <- drawEPic(m2r,'Model 2')
-
-# # Pure Zelig 5
-# z1 <- zlogit$new()
-# z1$zelig(Vote ~ Party + Amount, data=df)
-# z1$setrange(Party='R', Amount=rng)
-# z1$setrange1(Party='D', Amount=rng)
-# z1$sim()
-# # plot.ci(z1, ci=95)
-# 
-# z2 <- zlogit$new()
-# z2$zelig(Vote ~ Party * Amount, data=df)
-# z2$setrange(Party='R', Amount=rng)
-# z2$setrange1(Party='D', Amount=rng)
-# z2$sim()
-# # plot.ci(z2, ci=95)
-# 
-# m1 <- z1$sim.out
-# m2 <- z2$sim.out
 
 #' Big wrapper
 #' 
