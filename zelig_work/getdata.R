@@ -18,8 +18,3 @@ incr <- 5000
 maxd <- 200000
 rng  <- seq(0,maxd,incr)
 
-# Colorblind-safe red/blue hues for 
-# Republican/Democrat lines
-myRedBlue        <- c("#ef8a62", "#67a9cf")
-parties          <- c('R','D') # in this order
-names(myRedBlue) <- parties

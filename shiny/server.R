@@ -2,7 +2,7 @@ library(shiny)
 
 # code that runs once when app is launched
 # (getting ready for visitors)
-source("getdata.R")
+source("getdatasets.R")
 source("helpers.R")
 
 # this unnamed function runs every time
@@ -19,15 +19,10 @@ shinyServer(function(input, output) {
     output$thePlot <- renderPlot({ 
       # code that runs when visitors changes
       # an input widget goes here
-      input$getInput
-      params <- getInput()
-      isolate(getBigPicture(model=params$model,
-                            ci=params$ci,
-                            p=params$p))
-    })
-    output$theText <- renderText({
-       input$getInput
-       out <- paste(input$ass,input$pay,as.numeric(input$ci),sep=' ')
-       isolate(print(out))
+      input$goButton
+      isolate(params <- getInput())
+      getBigPicture(model=params$model,
+                    ci=params$ci,
+                    p=params$p)
     })
 })

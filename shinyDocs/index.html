@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>An app for pricing US Representatives</title>
+  <meta charset="utf-8">
+  <meta name="description" content="An app for pricing US Representatives">
+  <meta name="author" content="Gabi Huiber">
+  <meta name="generator" content="slidify" />
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta http-equiv="X-UA-Compatible" content="chrome=1">
+  <link rel="stylesheet" href="libraries/frameworks/io2012/css/default.css" media="all" >
+  <link rel="stylesheet" href="libraries/frameworks/io2012/css/phone.css" 
+    media="only screen and (max-device-width: 480px)" >
+  <link rel="stylesheet" href="libraries/frameworks/io2012/css/slidify.css" >
+  <link rel="stylesheet" href="libraries/highlighters/highlight.js/css/tomorrow.css" />
+  <base target="_blank"> <!-- This amazingness opens all links in a new tab. -->  
+  
+  <!-- Grab CDN jQuery, fall back to local if offline -->
+  <script src="http://ajax.aspnetcdn.com/ajax/jQuery/jquery-1.7.min.js"></script>
+  <script>window.jQuery || document.write('<script src="libraries/widgets/quiz/js/jquery.js"><\/script>')</script> 
+  <script data-main="libraries/frameworks/io2012/js/slides" 
+    src="libraries/frameworks/io2012/js/require-1.0.8.min.js">
+  </script>
+  
+  
+
+</head>
+<body style="opacity: 0">
+  <slides class="layout-widescreen">
+    
+    <!-- LOGO SLIDE -->
+        <slide class="title-slide segue nobackground">
+  <hgroup class="auto-fadein">
+    <h1>An app for pricing US Representatives</h1>
+    <h2>don't hire an expensive lobbyist if a competent bag man will do</h2>
+    <p>Gabi Huiber<br/>consultant</p>
+  </hgroup>
+  <article></article>  
+</slide>
+    
+
+    <!-- SLIDES -->
+    <slide class="" id="slide-1" style="background:;">
+  <hgroup>
+    <h2>The motivation</h2>
+  </hgroup>
+  <article data-timings="">
+    <ul>
+<li><a href="http://www.wired.com/2013/07/money-nsa-vote/">Lawmakers Who Upheld NSA Phone Spying Received Double the Defense Industry Cash</a>.</li>
+</ul>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-2" style="background:;">
+  <hgroup>
+    <h2>The working example</h2>
+  </hgroup>
+  <article data-timings="">
+    <ul>
+<li>In response to the first wave of Snowden revelations, US Representative Justin Amash (R, Mich.) introduced the &quot;Defund the NSA&quot; amendment on July 24, 2013.</li>
+<li>The amendment failed 217 No to 205 Yes, in line with the wishes of:
+
+<ul>
+<li>the President of the United States (on record  <a href="http://www.businessinsider.com/amash-amendment-nsa-white-house-obama-veto-2013-7">here</a>)</li>
+<li>security and defense industry interests (the surveillance state is a customer)</li>
+<li>US citizens who don&#39;t think that the NSA is doing anything wrong, and whose representatives carried the day (this is just how the system should work)</li>
+</ul></li>
+</ul>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="class" id="id" style="background:;">
+  <hgroup>
+    <h2>Some questions you might ask</h2>
+  </hgroup>
+  <article data-timings="">
+    <ol>
+<li>OK, so No votes collected more from defense interests than Yes votes did. So what? Do US representatives really respond to funding from special interests?</li>
+<li>If it turns out that they do, could you get an idea of how much might do the job?</li>
+<li>Could you use the recipe for pricing votes on other issues where interested parties might be curious?</li>
+</ol>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-4" style="background:;">
+  <hgroup>
+    <h2>The model</h2>
+  </hgroup>
+  <article data-timings="">
+    <ul>
+<li>Using data available in .csv format <a href="http://maplight.org/us-congress/bill/113-hr-2397/1742215/contributions-by-vote?sort=asc&amp;order=$%20From%20Interest%20Groups%3Cbr%20/%3EThat%20Opposed&amp;party%5BD%5D=D&amp;party%5BR%5D=R&amp;party%5BI%5D=I&amp;vote%5BAYE%5D=AYE&amp;vote%5BNOE%5D=NOE&amp;vote%5BNV%5D=NV&amp;voted_with%5Bwith%5D=with&amp;voted_with%5Bnot-with%5D=not-with&amp;state=&amp;custom_from=01/01/2011&amp;custom_to=12/31/2012&amp;all_pols=1&amp;uid=44999&amp;interests-support=&amp;interests-oppose=D2000-D3000-D5000-D9000-D4000-D0000-D6000&amp;from=01-01-2011&amp;to=12-31-2012&amp;source=pacs-nonpacs&amp;campaign=congressional">here</a> you can estimate the probability of a No vote as a function of party affiliation and industry funding using logistic regression.</li>
+<li>You can do this under two modeling assumptions: 
+
+<ul>
+<li>there&#39;s a baseline difference (e.g. Republicans are more likely to vote No, as their constituents might be law-and-order types who take a dim view of Snowden) but there is no difference in how representatives from either party respond to funding.</li>
+<li>there&#39;s both a baseline difference and a difference in how representatives from each party respond to funding (e.g. a Democrat who gets defense funding is less likely to show proper gratitude than a Republican counterpart, at any funding level).</li>
+</ul></li>
+<li>If under either assumption the response is flat over a plausible range of funding, that is evidence that special interests are wasting their time: when things do go their way, which makes it look like their money is well spent, that&#39;s just a coincidence between what they want and what the constituents of the majority want (wouldn&#39;t that be nice?).<br></li>
+</ul>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-5" style="background:;">
+  <hgroup>
+    <h2>The quantity of interest</h2>
+  </hgroup>
+  <article data-timings="">
+    <ul>
+<li>We don&#39;t want to just run a logit under each assumption above, report the parameter estimates, and go home. These days we can and should do better.</li>
+<li>We want to plot the <em>expected probability of a No vote over a reasonable range of funding levels</em>, by party, and simulate the uncertainty surrounding it.</li>
+<li>This would be useful: it would immediately tell an interested party how much for a vote in their favor, with probabillity shown within a chosen confidence band -- 80%, 95%, etc.</li>
+<li>This is both easy to do now with <a href="http://zeligproject.org/">Zelig</a> and has been the recommended approach since <a href="http://gking.harvard.edu/files/abs/making-abs.shtml">this seminal paper</a> in 2001.</li>
+</ul>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+<slide class="" id="slide-6" style="background:;">
+  <hgroup>
+    <h2>The app</h2>
+  </hgroup>
+  <article data-timings="">
+    <iframe src=https://ghuiber.shinyapps.io/Amash/></iframe>
+
+  </article>
+  <!-- Presenter Notes -->
+</slide>
+
+    <slide class="backdrop"></slide>
+  </slides>
+  <div class="pagination pagination-small" id='io2012-ptoc' style="display:none;">
+    <ul>
+      <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=1 title='The motivation'>
+         1
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=2 title='The working example'>
+         2
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=3 title='Some questions you might ask'>
+         3
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=4 title='The model'>
+         4
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=5 title='The quantity of interest'>
+         5
+      </a>
+    </li>
+    <li>
+      <a href="#" target="_self" rel='tooltip' 
+        data-slide=6 title='The app'>
+         6
+      </a>
+    </li>
+  </ul>
+  </div>  <!--[if IE]>
+    <script 
+      src="http://ajax.googleapis.com/ajax/libs/chrome-frame/1/CFInstall.min.js">  
+    </script>
+    <script>CFInstall.check({mode: 'overlay'});</script>
+  <![endif]-->
+</body>
+  <!-- Load Javascripts for Widgets -->
+  
+  <script src="shared/shiny.js" type="text/javascript"></script>
+  <script src="shared/slider/js/jquery.slider.min.js"></script>
+  <script src="shared/bootstrap/js/bootstrap.min.js"></script>
+  <link rel="stylesheet" href="shared/slider/css/jquery.slider.min.css"></link>
+  
+  <!-- LOAD HIGHLIGHTER JS FILES -->
+  <script src="libraries/highlighters/highlight.js/highlight.pack.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+  <!-- DONE LOADING HIGHLIGHTER JS FILES -->
+   
+  </html>
