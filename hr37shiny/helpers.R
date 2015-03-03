@@ -18,6 +18,32 @@ load('hr37sims.RData')
 
 # Now estimate prob of voting No as a function of Party and Amount.
 
+#' Helper for setting minimum and safe levels of pay
+#' 
+#' First, check that the solution is not trivial:
+#' it is if the slope of probability with respect
+#' to pay is zero or negative. In that case, the
+#' correct solution is to pay nothing.
+#' 
+#' @param m  an object returned by getRibbon()
+payZero <- function(m) {
+  # Default solution is trivial (pay nothing).
+  out        <- rep(TRUE,2)
+  names(out) <- parties
+  # The data frame below has the points on the response
+  # curve that correspond to the ends of the pay range.
+  minmax <- subset(m,Amount %in% c(0,max(Amount)))
+  # The data frame has the lowest point of the response 
+  # curve for each party. If this point corresponds to
+  # Amount=0, then the solution is not trivial.
+  minamt <- (minmax %>% 
+             group_by(Party) %>% 
+             slice(which.min(Median)))
+  check  <- intersect(names(out),minamt$Party[minamt$Amount==0])
+  out[check] <- FALSE
+  out
+}
+
 #' Minimum and safe levels of pay
 #' 
 #' You need to pick a level of pay that clears
@@ -30,9 +56,27 @@ load('hr37sims.RData')
 #' 
 #' @param m  an object returned by getRibbon()
 getPay <- function(m) {
+  out <- list()  
   mycols  <- as.data.frame(myRedBlue)
   colnames(mycols) <- 'Color'
-  mycols$Party <- rownames(mycols)
+  mycols$Party <- rownames(mycols)  
+  
+  # This is the trivial set, both parties
+  zeropay <- subset(m,Amount==0)
+  
+  # Identify trivial cases, if any
+  dontpay <- payZero(m)
+  zeropay <- subset(cbind(zeropay,dontpay),dontpay==TRUE,select=-dontpay)
+  zeropay <- merge(zeropay,mycols)
+  
+  # If both parties have trivial solution, exit
+  if(nrow(zeropay)==2) {
+    out[['min']]  <- zeropay
+    out[['safe']] <- zeropay
+    return(out)
+  } 
+  
+  # Otherwise identify non-trivial set
   minpay  <- (subset(m,Median>.5) %>% 
                 group_by(Party) %>% 
                 slice(which.min(Median)))
@@ -41,7 +85,11 @@ getPay <- function(m) {
                 group_by(Party) %>% 
                 slice(which.min(Low)))
   safepay <- merge(safepay,mycols)
-  out <- list()
+  
+  # Swap in trivial cases, if any
+  minpay[minpay$Party %in% zeropay$Party,] <- zeropay[zeropay$Party %in% minpay$Party,]
+  safepay[safepay$Party %in% zeropay$Party,] <- zeropay[zeropay$Party %in% safepay$Party,]
+
   out[['min']]  <- minpay
   out[['safe']] <- safepay
   return(out)
