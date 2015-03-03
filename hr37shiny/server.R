@@ -13,6 +13,7 @@ shinyServer(function(input, output) {
       out$model <- as.character(input$ass)
       out$ci    <- as.numeric(input$ci)
       out$p     <- as.character(input$pay) 
+      out$vote  <- as.character(input$vote)
       return(out)
     })  
     output$thePlot <- renderPlot({ 
@@ -22,6 +23,7 @@ shinyServer(function(input, output) {
       isolate(params <- getInput())
       getBigPicture(model=params$model,
                     ci=params$ci,
-                    p=params$p)
+                    p=params$p,
+                    vote=params$vote)
     })
 })

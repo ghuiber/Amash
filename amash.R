@@ -9,27 +9,18 @@ library("coin")
 library("Zelig")
 library("ggplot2")
 library("dplyr")
+library("rvest")
 
-# Read raw data
-df <- read.csv('amashvotevsmoney.csv',header=T,sep="|",stringsAsFactors=F,strip.white=T)
-bigset <- read.csv('amashbig.csv',header=T,stringsAsFactors=F)
-
-# Clean up a bit
-df$Amount    <- as.numeric(gsub("\\$|,","", df$Amount)) # make dollars numeric
-names(df)[3] <- 'District' # shorten district name
-df       <- df[df$Vote!='Not Voting',] # drop abstainers (want 2 categories for Wilcoxon rank-sum test)
-df$Vote  <- factor(df$Vote, levels=c('Yes','No'))
-df$Party <- factor(df$Party)
-
-incr <- 5000
-maxd <- 200000
-rng  <- seq(0,maxd,incr)
-
-# Colorblind-safe red/blue hues for 
-# Republican/Democrat lines
-myRedBlue        <- c("#ef8a62", "#67a9cf")
-parties          <- c('R','D') # in this order
-names(myRedBlue) <- parties
+# # Read raw data
+# df <- read.csv('amashvotevsmoney.csv',header=T,sep="|",stringsAsFactors=F,strip.white=T)
+# bigset <- read.csv('amashbig.csv',header=T,stringsAsFactors=F)
+# 
+# # Clean up a bit
+# df$Amount    <- as.numeric(gsub("\\$|,","", df$Amount)) # make dollars numeric
+# names(df)[3] <- 'District' # shorten district name
+# df       <- df[df$Vote!='Not Voting',] # drop abstainers (want 2 categories for Wilcoxon rank-sum test)
+# df$Vote  <- factor(df$Vote, levels=c('Yes','No'))
+# df$Party <- factor(df$Party)
 
 # # Relative average prices: how much for a No for Democrats vs. Republicans, nationally
 # getGoingPrice <- function(vote) {
@@ -95,6 +86,46 @@ names(myRedBlue) <- parties
 # # Show it pretty
 # print(format(NC.R.No$summary,big.mark=",",digits=4),quote=F)
 # print(format(No$summary,big.mark=",",digits=4),quote=F)
+
+#' Get raw data from maplight.org
+#' Depends on package rvest
+#' @param myurl URL to scrape from
+#' @param node which html node
+getMapLight <- function(myurl,node=6) {
+  x <- html(myurl)
+  df <- x %>% html_nodes('table') %>% .[[node]] %>% html_table()
+  yes <- names(df)[grep('Support',names(df))]
+  no  <- names(df)[grep('Oppose',names(df))]
+  df[['AmountYes']] <- as.numeric(gsub("[$,]","", df[[yes]]))
+  df[['AmountNo']]  <- as.numeric(gsub("[$,]","", df[[no]]))
+  names(df)[names(df)=="State"] <- "District"
+  df <- df[,!(names(df) %in% c(yes,no))]
+  # drop abstainers (want 2 categories for Wilcoxon rank-sum test)
+  df       <- df[df$Vote!='Not Voting',]
+  df$Vote  <- factor(df$Vote, levels=c('Yes','No'))
+  df$Party <- factor(df$Party)
+  return(df)
+}
+
+# Don't scrape if you don't have to
+scrapethis <- "http://maplight.org/us-congress/bill/113-hr-2397/1742215/contributions-by-vote?sort=asc&order=$%20From%20Interest%20Groups%3Cbr%20/%3EThat%20Opposed&party%5BD%5D=D&party%5BR%5D=R&party%5BI%5D=I&vote%5BAYE%5D=AYE&vote%5BNOE%5D=NOE&vote%5BNV%5D=NV&voted_with%5Bwith%5D=with&voted_with%5Bnot-with%5D=not-with&state=&custom_from=01/01/2011&custom_to=12/31/2012&all_pols=1&uid=44999&interests-support=&interests-oppose=D2000-D3000-D5000-D9000-D4000-D0000-D6000&from=01-01-2011&to=12-31-2012&source=pacs-nonpacs&campaign=congressional"
+if(!file.exists('amash.RData')) {
+  df <- getMapLight(myurl=scrapethis)
+  save(df,file='amash.RData')
+} else {
+  load('amash.RData')
+}
+
+# Funding range
+incr <- 5000
+maxd <- 200000
+rng  <- seq(0,maxd,incr)
+
+# Colorblind-safe red/blue hues for 
+# Republican/Democrat lines
+myRedBlue        <- c("#ef8a62", "#67a9cf")
+parties          <- c('R','D') # in this order
+names(myRedBlue) <- parties
 
 # Now estimate prob of voting No as a function of Party and Amount.
 
@@ -175,10 +206,11 @@ getPay <- function(m) {
 #' @param m an object returned by getRibbon()
 #' @param mname name of the model for prettier graph titles
 #' @param p an element from c('min','safe')
-drawEPic <- function(m,mname,p='min') {
+#' @param vote an element from c('Yes','No')
+drawEPic <- function(m,mname,p='min',vote='No') {
    pay <- getPay(m)[[p]] 
-   xl  <- 'Funding from security and defense interests'
-   yl  <- 'Expected P(votes No)'
+   xl  <- paste('Net funding from',vote,'interests',sep=' ')
+   yl  <- paste('Expected P(votes ',vote,')',sep='')
    pic <- ggplot(data=m, aes(x=Amount, y=Median, group=Party)) + 
      geom_ribbon(aes(ymin=Low,ymax=High,fill=Party),alpha=.2) +
      geom_line(aes(color=Party)) + xlab(xl) + 
@@ -199,6 +231,52 @@ drawEPic <- function(m,mname,p='min') {
                                                        'K',sep='')))
    return(pic)
 }
+
+#' Big wrapper
+#' 
+#' You set whether you want minimum or safe pay levels,
+#' and at which % confidence safe. You get a picture
+#' @param model string 'Model 1' or 'Model 2'
+#' @param ci numeric btw 0 and 1
+#' @param p string 'min' or 'safe'
+#' @param vote string 'Yes' or 'No'
+getBigPicture <- function(model='Model 1',ci=.95,p='min',vote='No') {
+  # which model: common slope vs. interaction
+  fml <<- paste("Vote==\'",vote,"\' ~ Party + Amount",sep="")
+  mdl <- 'Model 1: baseline difference by party, but same response to funding'
+  if(model=='Model 2') {
+    fml <<- paste("Vote==\'",vote,"\' ~ Party * Amount",sep="")
+    mdl <- 'Model 2: both baseline and response to funding are different by party'
+  }
+  mdl <- paste(mdl,'\n',sep='')
+  # which kind of pay level
+  pl <- 'minimum'
+  if(p=='safe') {
+    pl <- paste(ci*100,'% safe',sep='')
+  }
+  sb <- paste(mdl,'Funding level: ',pl,sep='')
+  ma <- paste('Expected probability of a',vote,'vote by party\n',sb,sep=' ')
+  # estimate model, simulate expected probability of a 
+  # favorable vote as a function of net funding from
+  # interests that want a Yes or a No outcome -- i.e.,
+  # Amount = AmountNo - AmountYes for a No vote, 
+  # or reverse the sign for a Yes vote
+  df$Amount <- df$AmountNo - df$AmountYes
+  if(vote=='Yes') df$Amount <- -df$Amount
+  z5 <- zlogit$new()
+  z5$zelig(formula=as.formula(fml), data=df)
+  z5$setrange(Party='R', Amount=rng)
+  z5$setrange1(Party='D', Amount=rng)
+  z5$sim()
+  # extract ribbon data
+  mr <- getRibbon(z5$sim.out,ci=ci)
+  # draw picture
+  pic <- drawEPic(mr,mname=ma,p=p,vote=vote)
+  return(pic)
+}
+
+m1.95.min <- getBigPicture()
+m2.80.safe <- getBigPicture(model='Model 2',ci=.8,p='safe')
 
 # Test code
 # m1r   <- getRibbon(m1)
@@ -223,42 +301,3 @@ drawEPic <- function(m,mname,p='min') {
 # 
 # m1 <- z1$sim.out
 # m2 <- z2$sim.out
-
-#' Big wrapper
-#' 
-#' You set whether you want minimum or safe pay levels,
-#' and at which % confidence safe. You get a picture
-#' @param x
-#' @param ci
-#' @param p
-getBigPicture <- function(model='Model 1',ci=.95,p='min') {
-  # which model: common slope vs. interaction
-  fml <<- 'Vote ~ Party + Amount'
-  mdl <- 'Model 1: baseline difference by party, but same response to funding'
-  if(model=='Model 2') {
-    fml <<- 'Vote ~ Party * Amount'
-    mdl <- 'Model 2: both baseline and response to funding are different by party'
-  }
-  mdl <- paste(mdl,'\n',sep='')
-  # which kind of pay level
-  pl <- 'minimum'
-  if(p=='safe') {
-    pl <- paste(ci*100,'% safe',sep='')
-  }
-  sb <- paste(mdl,'Funding level: ',pl,sep='')
-  ma <- paste('Expected probability of a No vote by party\n',sb,sep='')
-  # estimate model, simulate expected probability
-  z5 <- zlogit$new()
-  z5$zelig(formula=as.formula(fml), data=df)
-  z5$setrange(Party='R', Amount=rng)
-  z5$setrange1(Party='D', Amount=rng)
-  z5$sim()
-  # extract ribbon data
-  mr <- getRibbon(z5$sim.out,ci=ci)
-  # draw picture
-  pic <- drawEPic(mr,mname=ma,p=p)
-  return(pic)
-}
-
-m1.95.min <- getBigPicture()
-m2.80.safe <- getBigPicture(model='Model 2',ci=.8,p='safe')

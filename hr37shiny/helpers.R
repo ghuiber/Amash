@@ -14,7 +14,7 @@ myRedBlue        <- c("#ef8a62", "#67a9cf")
 parties          <- c('R','D') # in this order
 names(myRedBlue) <- parties
 # produced with ../zelig_work/zelig_work.R
-load('amashsims.RData')
+load('hr37sims.RData')
 
 # Now estimate prob of voting No as a function of Party and Amount.
 
@@ -57,29 +57,30 @@ getPay <- function(m) {
 #' @param m an object returned by getRibbon()
 #' @param mname name of the model for prettier graph titles
 #' @param p an element from c('min','safe')
-drawEPic <- function(m,mname,p='min') {
-   pay <- getPay(m)[[p]] 
-   xl  <- 'Funding from security and defense interests'
-   yl  <- 'Expected P(votes No)'
-   pic <- ggplot(data=m, aes(x=Amount, y=Median, group=Party)) + 
-     geom_ribbon(aes(ymin=Low,ymax=High,fill=Party),alpha=.2) +
-     geom_line(aes(color=Party)) + xlab(xl) + 
-     ylab(yl) + ggtitle(mname)
-   pic <- pic + scale_colour_manual(values=myRedBlue)
-   pic <- pic + geom_segment(data=pay,
-                             aes(x = Amount,
-                                 y = Low,
-                                 xend = Amount,
-                                 yend = High),
-                             color=pay$Color,
-                             size=2) +
-                 geom_hline(aes(yintercept=.5),alpha=.2) +
-                 geom_text(data=pay, aes(x = Amount,
-                                         y = .95*Low,
-                                         label = paste('$',
-                                                       round(Amount/1000),
-                                                       'K',sep='')))
-   return(pic)
+#' @param vote an element from c('Yes','No')
+drawEPic <- function(m,mname,p='min',vote='Yes') {
+  pay <- getPay(m)[[p]] 
+  xl  <- paste('Net funding from',vote,'interests',sep=' ')
+  yl  <- paste('Expected P(votes ',vote,')',sep='')
+  pic <- ggplot(data=m, aes(x=Amount, y=Median, group=Party)) + 
+    geom_ribbon(aes(ymin=Low,ymax=High,fill=Party),alpha=.2) +
+    geom_line(aes(color=Party)) + xlab(xl) + 
+    ylab(yl) + ggtitle(mname)
+  pic <- pic + scale_colour_manual(values=myRedBlue)
+  pic <- pic + geom_segment(data=pay,
+                            aes(x = Amount,
+                                y = Low,
+                                xend = Amount,
+                                yend = High),
+                            color=pay$Color,
+                            size=2) +
+    geom_hline(aes(yintercept=.5),alpha=.2) +
+    geom_text(data=pay, aes(x = Amount,
+                            y = .95*Low,
+                            label = paste('$',
+                                          round(Amount/1000),
+                                          'K',sep='')))
+  return(pic)
 }
 
 #' Big wrapper
@@ -89,7 +90,8 @@ drawEPic <- function(m,mname,p='min') {
 #' @param x
 #' @param ci
 #' @param p
-getBigPicture <- function(model='Model 1',ci=.95,p='min') {
+#' @param vote string 'Yes' or 'No'
+getBigPicture <- function(model='Model 1',ci=.95,p='min',vote='Yes') {
   # which model: common slope vs. interaction
   mdl <- 'Model 1: baseline difference by party, but same response to funding'
   if(model=='Model 2') {
@@ -102,10 +104,10 @@ getBigPicture <- function(model='Model 1',ci=.95,p='min') {
     pl <- paste(ci*100,'% safe',sep='')
   }
   sb <- paste(mdl,'Funding level: ',pl,sep='')
-  ma <- paste('Expected probability of a No vote by party\n',sb,sep='')
+  ma <- paste('Expected probability of a',vote,'vote by party\n',sb,sep=' ')
   # collect ribbon 
-  mr <- datasets[[model]][[paste(ci*100,'%')]]
+  mr <- datasets[[vote]][[model]][[paste(ci*100,'%')]]
   # draw picture
-  pic <- drawEPic(mr,mname=ma,p=p)
+  pic <- drawEPic(mr,mname=ma,p=p,vote=vote)
   return(pic)
 }
